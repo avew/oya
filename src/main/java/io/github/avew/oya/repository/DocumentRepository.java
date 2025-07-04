@@ -27,3 +27,4 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     @Query("SELECT COUNT(dc) FROM Document d JOIN d.chunks dc WHERE d.id = :documentId")
     Long countChunksByDocumentId(@Param("documentId") UUID documentId);
 }
+

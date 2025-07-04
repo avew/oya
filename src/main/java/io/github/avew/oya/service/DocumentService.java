@@ -9,6 +9,7 @@ import io.github.avew.oya.exception.DocumentProcessingException;
 import io.github.avew.oya.exception.FileValidationException;
 import io.github.avew.oya.repository.DocumentRepository;
 import io.github.avew.oya.repository.DocumentChunkRepository;
+import io.github.avew.oya.dto.DocumentSearchResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
@@ -38,7 +39,7 @@ public class DocumentService {
     @Value("${openai.api-key}")
     private String openAiApiKey;
 
-    @Value("${openai.model:text-embedding-ada-002}")
+    @Value("${openai.embedding-model:text-embedding-3-small}")
     private String embeddingModel;
 
     @Value("${app.upload.dir:./uploads}")
@@ -78,14 +79,14 @@ public class DocumentService {
         try {
             // Extract text using Apache Tika
             String content = extractTextFromFile(file);
-
+            log.debug("Processing file: {}", file.getOriginalFilename());
             // Split content into chunks
             List<String> chunks = splitIntoChunks(content);
-
+            log.debug("Split content into {} chunks", chunks.size());
             // Process each chunk
             for (int i = 0; i < chunks.size(); i++) {
                 String chunkContent = chunks.get(i);
-
+                log.debug("Processing chunk: {}", chunkContent);
                 // Generate embedding as vector string for pgvector
                 String embedding = generateVectorEmbedding(chunkContent);
 
@@ -151,6 +152,65 @@ public class DocumentService {
         } catch (Exception e) {
             log.warn("Hybrid search failed, falling back to text search", e);
             return documentChunkRepository.findByContentContaining(query, limit);
+        }
+    }
+
+    public List<DocumentSearchResult> searchDocumentChunksWithScores(String query, int limit) {
+        try {
+            String queryEmbedding = generateVectorEmbedding(query);
+            log.debug("Searching for documents with scores: {}", queryEmbedding);
+            if (queryEmbedding != null && !queryEmbedding.isEmpty()) {
+                // Get raw results from database
+                List<Object[]> rawResults = documentChunkRepository.findSimilarChunksByHybridSearchWithScoresRaw(queryEmbedding, query, limit);
+                // Convert raw results to DocumentSearchResult objects
+                // Array structure: [0]=id, [1]=document_id, [2]=chunk_index, [3]=content, [4]=token_count, [5]=created_at,
+                //                  [6]=vector_similarity, [7]=text_rank, [8]=hybrid_score
+                return rawResults.stream().map(row -> {
+                    DocumentChunk chunk = new DocumentChunk();
+                    chunk.setId(UUID.fromString(row[0].toString()));
+                    chunk.setChunkIndex((Integer) row[2]);
+                    chunk.setContent((String) row[3]);
+                    chunk.setEmbedding(null); // embedding tidak diperlukan untuk response
+                    chunk.setTokenCount((Integer) row[4]);
+
+                    // We need to fetch the document separately since it's not fully loaded
+                    UUID documentId = UUID.fromString(row[1].toString());
+                    Document document = documentRepository.findById(documentId).orElse(null);
+                    chunk.setDocument(document);
+
+                    return DocumentSearchResult.builder()
+                            .documentChunk(chunk)
+                            .vectorSimilarity(((Number) row[6]).doubleValue())
+                            .textRank(((Number) row[7]).doubleValue())
+                            .hybridScore(((Number) row[8]).doubleValue())
+                            .searchMethod("hybrid_search")
+                            .build();
+                }).toList();
+            } else {
+                // Fallback to text search without scores
+                List<DocumentChunk> chunks = documentChunkRepository.findByContentContaining(query, limit);
+                return chunks.stream()
+                        .map(chunk -> DocumentSearchResult.builder()
+                                .documentChunk(chunk)
+                                .vectorSimilarity(null)
+                                .textRank(null)
+                                .hybridScore(null)
+                                .searchMethod("text_search")
+                                .build())
+                        .toList();
+            }
+        } catch (Exception e) {
+            log.warn("Hybrid search with scores failed, falling back to text search", e);
+            List<DocumentChunk> chunks = documentChunkRepository.findByContentContaining(query, limit);
+            return chunks.stream()
+                    .map(chunk -> DocumentSearchResult.builder()
+                            .documentChunk(chunk)
+                            .vectorSimilarity(null)
+                            .textRank(null)
+                            .hybridScore(null)
+                            .searchMethod("text_search_fallback")
+                            .build())
+                    .toList();
         }
     }
 

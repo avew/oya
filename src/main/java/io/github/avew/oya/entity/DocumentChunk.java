@@ -1,13 +1,13 @@
 package io.github.avew.oya.entity;
 
+import io.github.avew.oya.config.VectorType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import org.hibernate.annotations.Type;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -35,7 +35,7 @@ public class DocumentChunk {
     private String content;
 
     @Column(name = "embedding", columnDefinition = "vector(1536)")
-    @JdbcTypeCode(SqlTypes.OTHER)
+    @Type(VectorType.class)
     private String embedding; // Store as vector string for pgvector
 
     @Column(name = "token_count")

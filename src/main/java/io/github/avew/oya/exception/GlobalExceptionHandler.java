@@ -11,16 +11,11 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
-import org.zalando.problem.Problem;
-import org.zalando.problem.Status;
-import org.zalando.problem.spring.web.advice.ProblemHandling;
-
-import java.net.URI;
 
 @RestControllerAdvice
 @RequiredArgsConstructor
 @Slf4j
-public class GlobalExceptionHandler implements ProblemHandling {
+public class GlobalExceptionHandler {
 
     private final MessageService messageService;
 
@@ -41,7 +36,7 @@ public class GlobalExceptionHandler implements ProblemHandling {
         log.error("File validation error: {}", ex.getMessage());
 
         // Determine specific file error code based on message content
-        String errorCode = determineFileErrorCode(ex.getDetail());
+        String errorCode = determineFileErrorCode(ex.getDetail() != null ? ex.getDetail() : "");
 
         ApiResponse<Object> response = ApiResponse.error(
             errorCode,
@@ -143,15 +138,5 @@ public class GlobalExceptionHandler implements ProblemHandling {
             return ResponseCodes.ValidationError.INVALID_STATUS;
         }
         return ResponseCodes.ValidationError.VALIDATION_FAILED; // default
-    }
-
-    // Override Problem handling to return our custom format
-    @Override
-    public ResponseEntity<Problem> handleThrowable(Throwable throwable, org.springframework.web.context.request.NativeWebRequest request) {
-        Problem problem = create(throwable, request);
-
-        // You could convert this to ApiResponse format if needed
-        // For now, we'll let specific handlers take precedence
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(problem);
     }
 }

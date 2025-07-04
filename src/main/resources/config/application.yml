@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: oya
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:oya}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:password}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate.jdbc.lob.non_contextual_creation: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+# Problem Spring Web configuration
+problem:
+  type-url: https://oya.github.io/problems/
+  debug-enabled: false
+  stacktrace-enabled: false
+
+app:
+  upload:
+    dir: ${UPLOAD_DIR:./uploads}
+
+openai:
+  api-key: ${OPENAI_API_KEY:xxx}
+  model: gpt-3.5-turbo
+  embedding-model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+
+logging:
+  level:
+    io.github.avew.oya: DEBUG

@@ -5,23 +5,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.support.ReloadableResourceBundleMessageSource;
 import org.springframework.web.servlet.LocaleResolver;
 import org.springframework.web.servlet.i18n.AcceptHeaderLocaleResolver;
-import org.zalando.problem.ProblemModule;
-import org.zalando.problem.violations.ConstraintViolationProblemModule;
 
 import java.util.Locale;
 
 @Configuration
 public class ProblemConfig {
-
-    @Bean
-    public ProblemModule problemModule() {
-        return new ProblemModule();
-    }
-
-    @Bean
-    public ConstraintViolationProblemModule constraintViolationProblemModule() {
-        return new ConstraintViolationProblemModule();
-    }
 
     @Bean
     public LocaleResolver localeResolver() {

@@ -14,6 +14,7 @@ public class DocumentProcessingException extends AbstractThrowableProblem {
     }
 
     public DocumentProcessingException(String message, Throwable cause) {
-        super(TYPE, "Document Processing Error", Status.INTERNAL_SERVER_ERROR, message, null, cause);
+        super(TYPE, "Document Processing Error", Status.INTERNAL_SERVER_ERROR, message);
+        initCause(cause);
     }
 }

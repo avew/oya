@@ -6,6 +6,7 @@ import com.theokanning.openai.completion.chat.ChatMessageRole;
 import com.theokanning.openai.service.OpenAiService;
 import io.github.avew.oya.dto.ChatRequest;
 import io.github.avew.oya.dto.ChatResponse;
+import io.github.avew.oya.dto.DocumentSearchResult;
 import io.github.avew.oya.entity.ChatHistory;
 import io.github.avew.oya.entity.Document;
 import io.github.avew.oya.entity.DocumentChunk;
@@ -112,20 +113,58 @@ public class ChatService {
     }
 
     private List<Document> searchRelevantDocuments(String message) {
+        log.info("Searching relevant documents for query: '{}'", message);
+
         try {
             // Use vector search with hybrid approach for better results
-            return documentService.searchDocumentChunksWithHybrid(message, MAX_CONTEXT_DOCUMENTS)
-                    .stream()
-                    .map(DocumentChunk::getDocument)
+            List<DocumentSearchResult> searchResults = documentService.searchDocumentChunksWithScores(message, MAX_CONTEXT_DOCUMENTS);
+
+            // Log detailed embedding scores for each result
+            log.info("Found {} document search results", searchResults.size());
+
+            for (int i = 0; i < searchResults.size(); i++) {
+                DocumentSearchResult result = searchResults.get(i);
+                DocumentChunk chunk = result.getDocumentChunk();
+
+                log.info("Document Search Result #{}: ", i + 1);
+                log.info("  - Document ID: {}", chunk.getDocument() != null ? chunk.getDocument().getId() : "N/A");
+                log.info("  - Chunk Index: {}", chunk.getChunkIndex());
+                log.info("  - Vector Similarity Score: {}", result.getVectorSimilarity());
+                log.info("  - Text Rank Score: {}", result.getTextRank());
+                log.info("  - Hybrid Score: {}", result.getHybridScore());
+                log.info("  - Search Method: {}", result.getSearchMethod());
+                log.info("  - Content Preview: {}",
+                    chunk.getContent().length() > 100 ?
+                    chunk.getContent().substring(0, 100) + "..." :
+                    chunk.getContent());
+                log.info("  - Token Count: {}", chunk.getTokenCount());
+            }
+
+            return searchResults.stream()
+                    .map(result -> result.getDocumentChunk().getDocument())
                     .distinct()
                     .limit(MAX_CONTEXT_DOCUMENTS)
                     .toList();
+
         } catch (Exception e) {
             log.warn("Error searching relevant documents with vector search, falling back to text search", e);
             // Fallback to regular text search
             try {
-                return documentService.searchDocumentChunks(message, MAX_CONTEXT_DOCUMENTS)
-                        .stream()
+                List<DocumentChunk> chunks = documentService.searchDocumentChunks(message, MAX_CONTEXT_DOCUMENTS);
+                log.info("Fallback search found {} chunks", chunks.size());
+
+                for (int i = 0; i < chunks.size(); i++) {
+                    DocumentChunk chunk = chunks.get(i);
+                    log.info("Fallback Result #{}: Document ID: {}, Chunk Index: {}, Content Preview: {}",
+                        i + 1,
+                        chunk.getDocument() != null ? chunk.getDocument().getId() : "N/A",
+                        chunk.getChunkIndex(),
+                        chunk.getContent().length() > 100 ?
+                        chunk.getContent().substring(0, 100) + "..." :
+                        chunk.getContent());
+                }
+
+                return chunks.stream()
                         .map(DocumentChunk::getDocument)
                         .distinct()
                         .limit(MAX_CONTEXT_DOCUMENTS)
@@ -169,18 +208,22 @@ public class ChatService {
 
     private String buildSystemPrompt(String documentContext) {
         return """
-                You are an AI assistant that helps users by answering questions based on uploaded documents.
+                Anda adalah seorang Support Agent yang profesional dan membantu. Tugas Anda adalah membantu pengguna dengan menjawab pertanyaan mereka berdasarkan dokumen yang telah diupload.
                 
-                Your role:
-                1. Answer questions using the provided document context when relevant
-                2. If the context doesn't contain relevant information, provide a helpful general response
-                3. Be concise but informative
-                4. Always be polite and professional
+                Ketentuan sebagai Support Agent:
+                1. Selalu ramah, sopan, dan profesional dalam berkomunikasi
+                2. Berikan jawaban yang akurat berdasarkan konteks dokumen yang tersedia
+                3. Jika informasi tidak tersedia dalam dokumen, sampaikan dengan jelas dan tawarkan bantuan alternatif
+                4. Gunakan bahasa Indonesia yang baik dan benar
+                5. Berikan jawaban yang terstruktur dan mudah dipahami
+                6. Jika ada pertanyaan yang tidak dapat dijawab, arahkan pengguna untuk menghubungi tim support lebih lanjut
+                7. Selalu konfirmasi pemahaman Anda terhadap pertanyaan pengguna
+                8. Berikan solusi yang praktis dan dapat ditindaklanjuti
                 
-                Document Context:
+                Konteks Dokumen:
                 %s
                 
-                Please answer the user's question based on this context and your general knowledge.
+                Sebagai Support Agent, jawab pertanyaan pengguna berdasarkan konteks dokumen di atas. Jika konteks tidak mencukupi, berikan jawaban yang membantu berdasarkan pengetahuan umum dan tawarkan bantuan lebih lanjut.
                 """.formatted(documentContext);
     }
 

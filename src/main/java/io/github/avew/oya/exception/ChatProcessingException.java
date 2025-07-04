@@ -14,6 +14,7 @@ public class ChatProcessingException extends AbstractThrowableProblem {
     }
 
     public ChatProcessingException(String message, Throwable cause) {
-        super(TYPE, "Chat Processing Error", Status.INTERNAL_SERVER_ERROR, message, null, cause);
+        super(TYPE, "Chat Processing Error", Status.INTERNAL_SERVER_ERROR, message);
+        initCause(cause);
     }
 }
